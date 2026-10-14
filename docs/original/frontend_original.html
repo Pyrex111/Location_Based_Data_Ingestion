@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Drive Portal</title>
+  <style>
+    #dropzone {
+      border: 2px dashed #aaa;
+      padding: 20px;
+      text-align: center;
+      color: #666;
+      margin: 50px auto;
+      width: 300px;
+    }
+    #manualCityInput {
+      display: none;
+      margin: 20px auto;
+      text-align: center;
+    }
+    #fileList {
+      margin: 20px auto;
+      text-align: center;
+    }
+    #fileList ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    #fileList li {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center;">Location Based Smart Drive</h1>
+  <div id="dropzone">Drag & Drop Files Here</div>
+  
+ 
+
+  <!-- Manual City Input -->
+  <div id="manualCityInput">
+    <label for="manual_city">Could Not Retrieve City Name. Please Enter Manually & Click "Upload File":</label><br><br>
+    <input type="text" id="manual_city" placeholder="Enter City Name">
+    <button id="uploadButton">Upload File</button>
+  </div>
+
+ <!-- Display Uploaded File Names -->
+  <div id="fileList">
+    <h3>Files to be Uploaded:</h3>
+    <ul id="fileNames"></ul>
+  </div>
+
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileList = document.getElementById('fileList');
+    const fileNames = document.getElementById('fileNames');
+    const manualCityInput = document.getElementById('manualCityInput');
+    const uploadButton = document.getElementById('uploadButton');
+    let uploadedFiles = []; // Store files for manual upload
+
+    // Drag & Drop functionality
+    dropzone.addEventListener('dragover', (e) => e.preventDefault());
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadedFiles = Array.from(e.dataTransfer.files);
+      
+      // Display filenames
+      fileNames.innerHTML = '';
+      uploadedFiles.forEach((file) => {
+        const li = document.createElement('li');
+        li.textContent = file.name;
+        fileNames.appendChild(li);
+      });
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+
+          const formData = new FormData();
+          uploadedFiles.forEach((file) => {
+            formData.append('files[]', file);
+          });
+          formData.append('latitude', latitude);
+          formData.append('longitude', longitude);
+
+          fetch('/upload', {
+            method: 'POST',
+            body: formData,
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.message.includes('Could not determine city')) {
+                // Show manual city input if location detection fails
+		alert(data.message);
+                manualCityInput.style.display = 'block';
+              } else {
+                alert(data.message);
+                uploadedFiles = []; // Clear files after successful upload
+                fileNames.innerHTML = ''; // Clear the displayed file list
+              }
+            })
+            .catch((err) => alert('Error: ' + err.message));
+        },
+        (error) => {
+          // If geolocation fails, show manual input option
+          alert('Geolocation error: ' + error.message);
+          manualCityInput.style.display = 'block';
+        }
+      );
+    });
+
+    // Manual city upload functionality
+    uploadButton.addEventListener('click', () => {
+      const manualCity = document.getElementById('manual_city').value.trim();
+      if (!manualCity) {
+        alert('Please enter a city name.');
+        return;
+      }
+
+      const formData = new FormData();
+      uploadedFiles.forEach((file) => {
+        formData.append('files[]', file);
+      });
+      formData.append('manual_city', manualCity);
+
+      fetch('/upload', {
+        method: 'POST',
+        body: formData,
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          alert(data.message);
+          manualCityInput.style.display = 'none'; // Hide manual input after upload
+          uploadedFiles = []; // Clear files after successful upload
+          fileNames.innerHTML = ''; // Clear the displayed file list
+        })
+        .catch((err) => alert('Error: ' + err.message));
+    });
+  </script>
+
+  <!-- Footer Section -->
+  <div class="bottom-text">
+    <p class="large-text"><b>Designed By: Taimoor, Suhan, Guangning, Lucy</b></p>
+    <p class="large-text"><b>Final Group Project for ECE569A - UVic</b></p>
+  </div>
+</body>
+</html>

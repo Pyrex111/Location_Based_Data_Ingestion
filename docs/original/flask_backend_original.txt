@@ -1,0 +1,66 @@
+import boto3
+from botocore.exceptions import NoCredentialsError
+from flask import Flask, request, jsonify, render_template
+import os
+import requests
+
+app = Flask(__name__)
+
+# AWS S3 Configuration
+S3_BUCKET = 'smart-drive-system'
+S3_REGION = 'us-east-2'
+AWS_ACCESS_KEY = 'KEY_REMOVED_FOR_SECURITY'
+AWS_SECRET_KEY = 'KEY_REMOVED_FOR_SECURITY'
+
+# Initialize S3 client
+s3 = boto3.client(
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY,
+    region_name=S3_REGION,
+)
+
+def get_city_name(lat, lon):
+    # Example with OpenCage API
+    API_URL = f"https://api.opencagedata.com/geocode/v1/json?q={lat}+{lon}&key=KEY_REMOVED_FOR_SECURITY"
+    response = requests.get(API_URL)
+    if response.status_code == 200:
+        results = response.json().get("results", [])
+        if results:
+            return results[0]["components"].get("city")
+    return None
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/upload', methods=['POST'])
+def upload_files():
+    files = request.files.getlist('files[]')
+    lat = request.form.get('latitude')
+    lon = request.form.get('longitude')
+    manual_city = request.form.get('manual_city')  # New field for manual input
+
+    # Get city name from coordinates
+    city = get_city_name(lat, lon)
+
+    # Fallback: Use manually provided city name if auto-detection fails
+    if not city:
+        if manual_city:
+            city = manual_city  # Use manual input
+        else:
+            return jsonify({"message": "Could not determine city. Please provide manually."}), 400
+
+    for file in files:
+        try:
+            # Define S3 object key (e.g., "city_name/filename")
+            s3_key = f"{city}/{file.filename}"
+            s3.upload_fileobj(file, S3_BUCKET, s3_key)
+        except NoCredentialsError:
+            return jsonify({"message": "Error: Unable to access S3 credentials."}), 500
+
+    return jsonify({"message": f"Files successfully uploaded to S3 in folder '{city}'."})
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.aws/
+credentials
+*.pem
+*.key
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
